@@ -2,12 +2,119 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import L from 'leaflet';
 import { Trip, TripItem } from '../types';
 import { fetchOsrmRoute } from '../utils/helpers';
-import { ChevronLeft, ChevronRight, Compass, MapPin as MapPinIcon, Navigation } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Compass } from 'lucide-react';
 
 interface OverviewMapProps {
   trip: Trip;
   selectedDate: string;
   onNavigateToCard: (itemId: string) => void;
+}
+
+// Pixel art SVG generators for different transport modes
+function getPixelSvg(mode: string = '도보'): string {
+  switch (mode) {
+    case '택시':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md car-bob">
+          <!-- Taxi Body -->
+          <rect x="5" y="14" width="22" height="10" rx="3" fill="#f59e0b" stroke="#1c2733" stroke-width="1.5"/>
+          <rect x="9" y="8" width="14" height="7" rx="2" fill="#fcd34d" stroke="#1c2733" stroke-width="1.5"/>
+          <!-- Windows -->
+          <rect x="11" y="10" width="4" height="4" fill="#38bdf8"/>
+          <rect x="17" y="10" width="5" height="4" fill="#38bdf8"/>
+          <!-- Taxi Cap -->
+          <rect x="14" y="5" width="4" height="3" fill="#ffffff" stroke="#1c2733" stroke-width="1"/>
+          <!-- Wheels -->
+          <circle cx="9" cy="24" r="3.5" fill="#1c2733"/>
+          <circle cx="9" cy="24" r="1.5" fill="#94a3b8"/>
+          <circle cx="23" cy="24" r="3.5" fill="#1c2733"/>
+          <circle cx="23" cy="24" r="1.5" fill="#94a3b8"/>
+          <!-- Lights -->
+          <rect x="25" y="16" width="2" height="3" fill="#ef4444"/>
+          <rect x="5" y="16" width="2" height="3" fill="#ffffff"/>
+        </svg>
+      `;
+    case '지하철':
+    case '기차':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md">
+          <!-- Train Body -->
+          <rect x="6" y="8" width="20" height="17" rx="3" fill="#1b4b7a" stroke="#1c2733" stroke-width="1.5"/>
+          <rect x="6" y="20" width="20" height="4" fill="#3f7cb0"/>
+          <!-- Windows -->
+          <rect x="9" y="11" width="14" height="6" rx="1" fill="#bae6fd" stroke="#1c2733" stroke-width="1"/>
+          <!-- Front Headlights -->
+          <circle cx="10" cy="22" r="1.5" fill="#fef08a"/>
+          <circle cx="22" cy="22" r="1.5" fill="#fef08a"/>
+          <!-- Wheels/Tracks -->
+          <rect x="8" y="25" width="4" height="3" fill="#475569"/>
+          <rect x="20" y="25" width="4" height="3" fill="#475569"/>
+        </svg>
+      `;
+    case '트램':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md">
+          <!-- Pantograph (Overhead power connector) -->
+          <path d="M16 2 L12 6 L20 6 Z" fill="none" stroke="#1c2733" stroke-width="1.5"/>
+          <line x1="16" y1="6" x2="16" y2="8" stroke="#1c2733" stroke-width="1.5"/>
+          <!-- Tram Body -->
+          <rect x="6" y="8" width="20" height="17" rx="3" fill="#4f46e5" stroke="#1c2733" stroke-width="1.5"/>
+          <rect x="9" y="11" width="6" height="6" fill="#e0e7ff"/>
+          <rect x="17" y="11" width="6" height="6" fill="#e0e7ff"/>
+          <!-- Front Lights -->
+          <circle cx="10" cy="22" r="1.5" fill="#fde047"/>
+          <circle cx="22" cy="22" r="1.5" fill="#fde047"/>
+          <rect x="8" y="25" width="16" height="2" fill="#334155"/>
+        </svg>
+      `;
+    case '버스':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md car-bob">
+          <!-- Bus Body -->
+          <rect x="5" y="8" width="22" height="17" rx="3" fill="#059669" stroke="#1c2733" stroke-width="1.5"/>
+          <!-- Windows -->
+          <rect x="8" y="11" width="4" height="5" fill="#a7f3d0"/>
+          <rect x="14" y="11" width="4" height="5" fill="#a7f3d0"/>
+          <rect x="20" y="11" width="4" height="5" fill="#a7f3d0"/>
+          <!-- Wheels -->
+          <circle cx="10" cy="25" r="3" fill="#1c2733"/>
+          <circle cx="22" cy="25" r="3" fill="#1c2733"/>
+        </svg>
+      `;
+    case '항공':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md">
+          <circle cx="16" cy="16" r="14" fill="#0284c7" stroke="#ffffff" stroke-width="1.5"/>
+          <text x="16" y="22" font-size="16" text-anchor="middle" fill="#ffffff">✈️</text>
+        </svg>
+      `;
+    case '자전거':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md">
+          <circle cx="16" cy="16" r="14" fill="#0d9488" stroke="#ffffff" stroke-width="1.5"/>
+          <text x="16" y="22" font-size="16" text-anchor="middle" fill="#ffffff">🚲</text>
+        </svg>
+      `;
+    default: // 도보 (Walking Traveler with backpack & 2-frame stepping legs)
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="w-10 h-10 drop-shadow-md">
+          <!-- Shadow -->
+          <ellipse cx="16" cy="29" rx="7" ry="2" fill="rgba(0,0,0,0.2)"/>
+          <!-- Backpack -->
+          <rect x="7" y="11" width="5" height="9" rx="1.5" fill="#d9724a" stroke="#1c2733" stroke-width="1"/>
+          <!-- Body / Clothes -->
+          <rect x="12" y="11" width="8" height="10" rx="2" fill="#1b4b7a" stroke="#1c2733" stroke-width="1"/>
+          <!-- Head / Hair / Hat -->
+          <circle cx="16" cy="7" r="4.5" fill="#fde047" stroke="#1c2733" stroke-width="1"/>
+          <rect x="13" y="4" width="6" height="3" rx="1" fill="#e0a94e"/>
+          <!-- Animated Legs (2-frame walk) -->
+          <g class="walking-anim">
+            <line x1="14" y1="21" x2="12" y2="28" stroke="#1c2733" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="18" y1="21" x2="20" y2="28" stroke="#1c2733" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+      `;
+  }
 }
 
 export const OverviewMap: React.FC<OverviewMapProps> = ({
@@ -34,10 +141,10 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [routeSegments, setRouteSegments] = useState<[number, number][][]>([]);
-  const [characterPos, setCharacterPos] = useState<[number, number] | null>(null);
-  const animFrameRef = useRef<number | null>(null);
+  const isAnimatingRef = useRef<boolean>(false);
+  const animFrameIdRef = useRef<number | null>(null);
 
-  // Initialize current index based on current time or 0
+  // Synchronize index to current time on date change
   useEffect(() => {
     if (itemsWithCoords.length === 0) {
       setCurrentIndex(0);
@@ -45,14 +152,8 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
     }
     const now = new Date();
     const currentHM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
-    // Find first item after current time
     const nextIdx = itemsWithCoords.findIndex((it) => (it.time || '') >= currentHM);
-    if (nextIdx !== -1) {
-      setCurrentIndex(nextIdx);
-    } else {
-      setCurrentIndex(0);
-    }
+    setCurrentIndex(nextIdx !== -1 ? nextIdx : 0);
   }, [selectedDate, itemsWithCoords]);
 
   // 1. Initialize Leaflet Map
@@ -69,7 +170,6 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
         maxZoom: 19,
       }).addTo(map);
 
-      // Add zoom control at top-right
       L.control.zoom({ position: 'topright' }).addTo(map);
 
       markersGroupRef.current = L.layerGroup().addTo(map);
@@ -85,7 +185,7 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
     };
   }, []);
 
-  // 2. Fetch OSRM Road Routes for each sequential pair of points
+  // 2. Fetch OSRM Road Routes for each sequential pair
   useEffect(() => {
     let isCancelled = false;
 
@@ -128,7 +228,7 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
     };
   }, [itemsWithCoords]);
 
-  // 3. Render Markers & Polylines on the Map
+  // 3. Render Numbered Markers & Polylines
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !markersGroupRef.current || !polylinesGroupRef.current) return;
@@ -182,14 +282,14 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
         color: isPast ? '#1b4b7a' : '#94a3b8',
         weight: isPast ? 4 : 3,
         dashArray: isPast ? undefined : '6, 6',
-        opacity: isPast ? 0.9 : 0.6,
+        opacity: isPast ? 0.95 : 0.6,
       });
 
       polylinesGroupRef.current?.addLayer(poly);
     });
 
-    // Fit bounds smoothly
-    if (latLngBounds.length > 0) {
+    // Initial bounding fit
+    if (latLngBounds.length > 0 && !isAnimatingRef.current) {
       map.fitBounds(L.latLngBounds(latLngBounds), {
         padding: [60, 60],
         maxZoom: 15,
@@ -198,67 +298,162 @@ export const OverviewMap: React.FC<OverviewMapProps> = ({
     }
   }, [itemsWithCoords, routeSegments, currentIndex, onNavigateToCard]);
 
-  // 4. Animated Character on the active path
-  const getTransportIconHtml = useCallback((mode?: string) => {
-    switch (mode) {
-      case '지하철':
-      case '기차':
-        return `<div class="w-9 h-9 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg shadow-lg border-2 border-white">🚆</div>`;
-      case '택시':
-        return `<div class="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center text-lg shadow-lg border-2 border-white car-bob">🚕</div>`;
-      case '버스':
-        return `<div class="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center text-lg shadow-lg border-2 border-white">🚌</div>`;
-      case '트램':
-        return `<div class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-lg shadow-lg border-2 border-white">🚊</div>`;
-      case '항공':
-        return `<div class="w-9 h-9 rounded-full bg-sky-600 text-white flex items-center justify-center text-lg shadow-lg border-2 border-white">✈️</div>`;
-      case '자전거':
-        return `<div class="w-9 h-9 rounded-full bg-teal-600 text-white flex items-center justify-center text-lg shadow-lg border-2 border-white">🚲</div>`;
-      default: // 도보
-        return `<div class="w-9 h-9 rounded-full bg-[#d9724a] text-white flex items-center justify-center text-lg shadow-lg border-2 border-white walking-anim">🚶</div>`;
-    }
-  }, []);
+  // 4. Smooth Road Path Animated Character Movement
+  const animateCharacterAlongPath = useCallback(
+    (fromIdx: number, toIdx: number) => {
+      const map = mapInstanceRef.current;
+      if (!map || itemsWithCoords.length === 0) return;
 
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || itemsWithCoords.length === 0) return;
+      const targetItem = itemsWithCoords[toIdx];
+      if (!targetItem?.lat || !targetItem?.lng) return;
 
-    // Target position is itemsWithCoords[currentIndex]
-    const targetItem = itemsWithCoords[currentIndex];
-    if (!targetItem || typeof targetItem.lat !== 'number' || typeof targetItem.lng !== 'number') return;
+      // Extract dense points along the path between fromIdx and toIdx
+      let pathPoints: [number, number][] = [];
 
-    const targetPos: [number, number] = [targetItem.lat, targetItem.lng];
-
-    // Smoothly animate character marker to targetPos
-    if (charMarkerRef.current) {
-      charMarkerRef.current.remove();
-    }
-
-    const mode = targetItem.move || '도보';
-    const iconHtml = getTransportIconHtml(mode);
-
-    const charIcon = L.divIcon({
-      className: 'leaflet-char-icon',
-      html: iconHtml,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
-    });
-
-    const marker = L.marker(targetPos, { icon: charIcon, zIndexOffset: 1000 }).addTo(map);
-    charMarkerRef.current = marker;
-    setCharacterPos(targetPos);
-
-    // Pan map to character if outside current bounds
-    if (!map.getBounds().contains(targetPos)) {
-      map.panTo(targetPos, { animate: true, duration: 0.8 });
-    }
-
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
+      if (fromIdx < toIdx && routeSegments.length > 0) {
+        for (let s = fromIdx; s < toIdx && s < routeSegments.length; s++) {
+          pathPoints.push(...routeSegments[s]);
+        }
+      } else if (fromIdx > toIdx && routeSegments.length > 0) {
+        for (let s = fromIdx - 1; s >= toIdx && s >= 0; s--) {
+          const reversed = [...routeSegments[s]].reverse();
+          pathPoints.push(...reversed);
+        }
       }
-    };
-  }, [currentIndex, itemsWithCoords, getTransportIconHtml]);
+
+      if (pathPoints.length < 2) {
+        const fromItem = itemsWithCoords[fromIdx];
+        if (fromItem?.lat && fromItem?.lng) {
+          pathPoints = [
+            [fromItem.lat, fromItem.lng],
+            [targetItem.lat, targetItem.lng],
+          ];
+        } else {
+          pathPoints = [[targetItem.lat, targetItem.lng]];
+        }
+      }
+
+      // Calculate total path distance in meters to gauge duration between 1.6s ~ 4.0s
+      let totalDist = 0;
+      for (let i = 0; i < pathPoints.length - 1; i++) {
+        const p1 = L.latLng(pathPoints[i][0], pathPoints[i][1]);
+        const p2 = L.latLng(pathPoints[i + 1][0], pathPoints[i + 1][1]);
+        totalDist += p1.distanceTo(p2);
+      }
+
+      const durationMs = Math.min(4000, Math.max(1600, (totalDist / 1000) * 800));
+
+      const mode = targetItem.move || '도보';
+      const svgHtml = getPixelSvg(mode);
+
+      const charIcon = L.divIcon({
+        className: 'leaflet-char-icon',
+        html: `<div class="cursor-pointer -translate-x-1/2 -translate-y-1/2">${svgHtml}</div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
+
+      if (!charMarkerRef.current) {
+        charMarkerRef.current = L.marker(pathPoints[0], {
+          icon: charIcon,
+          zIndexOffset: 1000,
+        }).addTo(map);
+      } else {
+        charMarkerRef.current.setIcon(charIcon);
+        charMarkerRef.current.setLatLng(pathPoints[0]);
+      }
+
+      isAnimatingRef.current = true;
+      const startTime = performance.now();
+
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
+
+      const step = (now: number) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / durationMs);
+
+        // Ease in-out quadratic for smooth acceleration and deceleration
+        const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+        const targetDist = ease * totalDist;
+
+        // Find position along pathPoints
+        let accDist = 0;
+        let currentLatLng: [number, number] = pathPoints[pathPoints.length - 1];
+
+        for (let i = 0; i < pathPoints.length - 1; i++) {
+          const p1 = L.latLng(pathPoints[i][0], pathPoints[i][1]);
+          const p2 = L.latLng(pathPoints[i + 1][0], pathPoints[i + 1][1]);
+          const segDist = p1.distanceTo(p2);
+
+          if (accDist + segDist >= targetDist || i === pathPoints.length - 2) {
+            const segRatio = segDist > 0 ? (targetDist - accDist) / segDist : 1;
+            const clampedRatio = Math.max(0, Math.min(1, segRatio));
+            const lat = pathPoints[i][0] + (pathPoints[i + 1][0] - pathPoints[i][0]) * clampedRatio;
+            const lng = pathPoints[i][1] + (pathPoints[i + 1][1] - pathPoints[i][1]) * clampedRatio;
+            currentLatLng = [lat, lng];
+            break;
+          }
+          accDist += segDist;
+        }
+
+        if (charMarkerRef.current) {
+          charMarkerRef.current.setLatLng(currentLatLng);
+        }
+
+        // Keep character in view by panning if it approaches edge
+        if (map && !map.getBounds().pad(-0.15).contains(currentLatLng)) {
+          map.panTo(currentLatLng, { animate: false });
+        }
+
+        if (progress < 1) {
+          animFrameIdRef.current = requestAnimationFrame(step);
+        } else {
+          isAnimatingRef.current = false;
+          if (charMarkerRef.current) {
+            charMarkerRef.current.setLatLng([targetItem.lat!, targetItem.lng!]);
+          }
+        }
+      };
+
+      animFrameIdRef.current = requestAnimationFrame(step);
+    },
+    [itemsWithCoords, routeSegments]
+  );
+
+  // Trigger animation when index changes
+  const prevIndexRef = useRef<number>(currentIndex);
+  useEffect(() => {
+    if (prevIndexRef.current !== currentIndex) {
+      animateCharacterAlongPath(prevIndexRef.current, currentIndex);
+      prevIndexRef.current = currentIndex;
+    } else {
+      // First mount position
+      const currentItem = itemsWithCoords[currentIndex];
+      if (currentItem?.lat && currentItem?.lng && mapInstanceRef.current) {
+        const mode = currentItem.move || '도보';
+        const svgHtml = getPixelSvg(mode);
+        const charIcon = L.divIcon({
+          className: 'leaflet-char-icon',
+          html: `<div class="cursor-pointer -translate-x-1/2 -translate-y-1/2">${svgHtml}</div>`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+        });
+
+        if (!charMarkerRef.current) {
+          charMarkerRef.current = L.marker([currentItem.lat, currentItem.lng], {
+            icon: charIcon,
+            zIndexOffset: 1000,
+          }).addTo(mapInstanceRef.current);
+        } else {
+          charMarkerRef.current.setIcon(charIcon);
+          charMarkerRef.current.setLatLng([currentItem.lat, currentItem.lng]);
+        }
+      }
+    }
+  }, [currentIndex, animateCharacterAlongPath, itemsWithCoords]);
 
   const handlePrev = () => {
     setCurrentIndex((prev) => Math.max(0, prev - 1));

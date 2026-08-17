@@ -68,6 +68,29 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
+  // Lock background scroll when any sheet or modal is open
+  const isAnyModalOpen =
+    itemModalState.isOpen ||
+    flightModalState.isOpen ||
+    tripModalState.isOpen ||
+    isTripListOpen ||
+    isSettingsOpen ||
+    isGuideOpen;
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [isAnyModalOpen]);
+
   // Toast state
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {

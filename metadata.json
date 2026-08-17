@@ -1,0 +1,6 @@
+{
+  "name": "여행 플래너",
+  "description": "모바일 최적화 여행 일정 관리 및 애니메이션 오버뷰 지도 웹앱",
+  "requestFramePermissions": ["geolocation", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
